@@ -7,10 +7,15 @@ from product import Product
 from physical_product import PhysicalProduct
 from digital_product import DigitalProduct
 from product_factory import ProductFactory
+from percentage_discount import PercentageDiscount
+from bulk_discount import BulkDiscount
+from student_discount import StudentDiscount
+from helpers import get_positive_float, load_products
 
 # Adjust the import names above to match your file names.
 
 FILENAME = "inventory.json"
+DEFAULT_CSV = "products.csv"
 
 # One shared Supplier object per supplier ID, so products from the same
 # supplier reference the same object (association, not copies).
@@ -23,16 +28,6 @@ def get_or_create_supplier(supplier_id: str, name: str, email: str) -> Supplier:
         suppliers[key] = Supplier(supplier_id, name, email)
     return suppliers[key]
 
-def get_positive_float(prompt: str) -> float:
-    while True:
-        try:
-            value = float(input(prompt))
-            if value <= 0:
-                print("Please enter a number greater than zero.")
-                continue
-            return value
-        except ValueError:
-            print("Please enter a valid number, e.g. 12.50")
 
 # ---------- Saving / loading ----------
 
@@ -117,12 +112,14 @@ def show_menu() -> None:
 3. Update Stock
 4. Search Product
 5. Save Inventory
-6. Test: Association (Supplier - Product)
-7. Test: Aggregation (Inventory - Product)
-8. Test: Composition (Order - OrderLine)
-9. Test: LSP
-10. Test: Polymorphism 
-11. Exit
+6. Load Products from CSV
+7. Test: Association (Supplier - Product)
+8. Test: Aggregation (Inventory - Product)
+9. Test: Composition (Order - OrderLine)
+10. Test: LSP
+11. Test: Polymorphism
+12. Test: Strategy (Order Discounts)
+13. Exit
 ----------------------------
 """)
 
@@ -170,11 +167,24 @@ def prompt_new_product() -> Product | None:
         return None
 
 
+def run_load_products(inventory: Inventory) -> None:
+    """Menu option: load products from a CSV file using load_products()."""
+    path = input(f"Enter CSV file path (press Enter for {DEFAULT_CSV}): ").strip()
+    if path == "":
+        path = DEFAULT_CSV
+    supplier = prompt_supplier()
+    load_products(path, inventory, supplier)
+
+
+# ---------- Test / demo functions ----------
+
 def run_association_test() -> None:
     print("\n=== ASSOCIATION TEST: Supplier and Product ===")
     supplier = Supplier("S900", "Test Supplier", "test@example.com")
-    laptop = ProductFactory.create("physical", "T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier)
-    ebook = ProductFactory.create("digital","T-D1", "Test Ebook", 25.0, 100, 5.0, supplier)
+    laptop = ProductFactory.create("physical", "T-P1", "Test Laptop", 1200.0, 10,
+                                   supplier, weight=2.5)
+    ebook = ProductFactory.create("digital", "T-D1", "Test Ebook", 25.0, 100,
+                                  supplier, download_size=5.0)
 
     print("\nLaptop's supplier:")
     laptop.get_supplier().display_information()
@@ -195,7 +205,8 @@ def run_association_test() -> None:
 def run_aggregation_test() -> None:
     print("\n=== AGGREGATION TEST: Inventory and Product ===")
     supplier = Supplier("S900", "Test Supplier", "test@example.com")
-    laptop = ProductFactory.create("physical", "T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier)
+    laptop = ProductFactory.create("physical", "T-P1", "Test Laptop", 1200.0, 10,
+                                   supplier, weight=2.5)
     inventory_a = Inventory()
     inventory_b = Inventory()
 
@@ -227,8 +238,10 @@ def run_aggregation_test() -> None:
 def run_composition_test() -> None:
     print("\n=== COMPOSITION TEST: Order and OrderLine ===")
     supplier = Supplier("S900", "Test Supplier", "test@example.com")
-    laptop = ProductFactory.create("physical","T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier)
-    ebook = ProductFactory.create("digital","T-D1", "Test Ebook", 25.0, 100, 5.0, supplier)
+    laptop = ProductFactory.create("physical", "T-P1", "Test Laptop", 1200.0, 10,
+                                   supplier, weight=2.5)
+    ebook = ProductFactory.create("digital", "T-D1", "Test Ebook", 25.0, 100,
+                                  supplier, download_size=5.0)
 
     order_1 = Order("O001")
     order_1.add_order_line(laptop, 2)
@@ -261,8 +274,10 @@ def run_composition_test() -> None:
 def run_lsp_test() -> None:
     print("\n=== LSP TEST: Substitutability ===")
     supplier = Supplier("S900", "Test Supplier", "test@example.com")
-    laptop = ProductFactory.create("physical","T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier)
-    ebook = ProductFactory.create("digital", "T-D1", "Test Ebook", 25.0, 100, 5.0, supplier)
+    laptop = ProductFactory.create("physical", "T-P1", "Test Laptop", 1200.0, 10,
+                                   supplier, weight=2.5)
+    ebook = ProductFactory.create("digital", "T-D1", "Test Ebook", 25.0, 100,
+                                  supplier, download_size=5.0)
 
     print("\n1. One function, both subclasses (no changes to the function):")
     show_product_details(laptop)
@@ -293,6 +308,7 @@ def run_lsp_test() -> None:
     print("\n5. Remove works for either type. Products left:",
           len(test_inventory.get_all_products()))
 
+
 def run_polymorphism_test() -> None:
     print("\n=== POLYMORPHISM TEST ===")
     supplier = Supplier("S900", "Test Supplier", "test@example.com")
@@ -302,15 +318,54 @@ def run_polymorphism_test() -> None:
     #   Ebook  -> "Product is delivered digitally"
 
     inventory = Inventory()
-    inventory.add_product(ProductFactory.create("physical","T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier))
-    inventory.add_product(ProductFactory.create("digital","T-D1", "Test Ebook", 25.0, 100, 5.0, supplier))
-    inventory.add_product(ProductFactory.create("physical","T-P2", "Test Keyboard", 80.0, 30, 0.8, supplier))
+    inventory.add_product(ProductFactory.create("physical", "T-P1", "Test Laptop", 1200.0, 10,
+                                                supplier, weight=2.5))
+    inventory.add_product(ProductFactory.create("digital", "T-D1", "Test Ebook", 25.0, 100,
+                                                supplier, download_size=5.0))
+    inventory.add_product(ProductFactory.create("physical", "T-P2", "Test Keyboard", 80.0, 30,
+                                                supplier, weight=0.8))
 
     print("\nOne loop over the Product collection, no isinstance():\n")
     for product in inventory.get_all_products():
         product.display_information()
         print(f"Fulfilment: {product.get_fulfilment_info()}")
         print()
+
+
+def run_strategy_test() -> None:
+    print("\n=== STRATEGY TEST: Order Discounts ===")
+    supplier = Supplier("S900", "Test Supplier", "test@example.com")
+    item = ProductFactory.create("physical", "T-P1", "Test Item", 25.0, 100,
+                                 supplier, weight=1.0)
+
+    # Predict first (write these in your Word doc BEFORE running):
+    #   No discount -> 250.0 | Bulk(200, 20) -> 230.0 | Percentage(10) -> 225.0
+    #   Student (5%) -> 237.5
+
+    order = Order("O-D1")
+    order.add_order_line(item, 10)
+    print("\nOrder lines add up to 250.0")
+    print("No discount (default):         ", order.calculate_total())
+
+    order.set_discount(BulkDiscount(200, 20))
+    print("BulkDiscount(200, 20):         ", order.calculate_total())
+
+    order.set_discount(PercentageDiscount(10))
+    print("set_discount(Percentage(10)):  ", order.calculate_total())
+    print("   (replaced, not stacked: 10% off the original 250)")
+
+    order.set_discount(StudentDiscount())
+    print("StudentDiscount (new strategy):", order.calculate_total())
+    print("   (Order was not changed to add this strategy)")
+
+    shared = PercentageDiscount(10)
+    order_a = Order("O-A", shared)
+    order_b = Order("O-B", shared)
+    order_a.add_order_line(item, 4)
+    order_b.add_order_line(item, 8)
+    print("\nTwo orders sharing one PercentageDiscount object:")
+    print("Order A (100.0 before discount):", order_a.calculate_total())
+    print("Order B (200.0 before discount):", order_b.calculate_total())
 
 
 # ---------- Main program ----------
@@ -321,9 +376,9 @@ load_inventory(main_inventory)
 while True:
     show_menu()
     try:
-        option = int(input("Enter option (1-11): "))
+        option = int(input("Enter option (1-13): "))
     except ValueError:
-        print("Please enter a number from 1 to 11.")
+        print("Please enter a number from 1 to 13.")
         continue
 
     match option:
@@ -347,7 +402,6 @@ while True:
             except ValueError as e:
                 print(f"Invalid Input: {e}")
                 continue
-            
         case 4:
             product_id = input("Enter Product ID: ").strip()
             product = main_inventory.find_product(product_id)
@@ -358,16 +412,20 @@ while True:
         case 5:
             save_inventory(main_inventory)
         case 6:
-            run_association_test()
+            run_load_products(main_inventory)
         case 7:
-            run_aggregation_test()
+            run_association_test()
         case 8:
-            run_composition_test()
+            run_aggregation_test()
         case 9:
-            run_lsp_test()
+            run_composition_test()
         case 10:
-            run_polymorphism_test()
+            run_lsp_test()
         case 11:
+            run_polymorphism_test()
+        case 12:
+            run_strategy_test()
+        case 13:
             exit_program(main_inventory)
             break
         case _:

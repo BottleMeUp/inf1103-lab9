@@ -1,3 +1,9 @@
+import csv
+from inventory import Inventory
+from supplier import Supplier
+from product_factory import ProductFactory
+
+
 def get_positive_float(prompt: str) -> float:
     while True:
         try:
@@ -8,3 +14,34 @@ def get_positive_float(prompt: str) -> float:
             return value
         except ValueError:
             print("Please enter a valid number, e.g. 12.50")
+
+def load_products(path: str, inventory: Inventory, supplier: Supplier) -> None:
+    try:
+        file = open(path, newline="")
+    except FileNotFoundError:
+        print(f"Products file not found: {path}")
+    else:
+        loaded = 0
+        with file:
+            reader = csv.reader(file)
+            next(reader, None)  # skip the header row
+
+            for row in reader:
+                try:
+                    product_type, product_id, name, price, stock_quantity = row
+                    product = ProductFactory.create(
+                        product_type.strip(),
+                        product_id.strip(),
+                        name.strip(),
+                        float(price),
+                        int(stock_quantity),
+                        supplier,
+                    )
+                    inventory.add_product(product)
+                    loaded += 1
+                except ValueError as e:
+                    print(f"Skipped row {row}: {e}")
+
+        print(f"{loaded} products loaded.")
+    finally:
+        print("Load attempt finished.")

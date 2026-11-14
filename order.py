@@ -4,7 +4,7 @@ from discount_strategy import DiscountStrategy
 from no_discount import NoDiscount
 
 class Order:
-    def __init__(self, order_id: str, discount_strategy: DiscountStrategy | None):
+    def __init__(self, order_id: str, discount_strategy: DiscountStrategy | None = None):
         self.__order_id: str = order_id
         self.__order_lines: list[OrderLine] = []
         if discount_strategy is None:
