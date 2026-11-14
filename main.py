@@ -23,6 +23,16 @@ def get_or_create_supplier(supplier_id: str, name: str, email: str) -> Supplier:
         suppliers[key] = Supplier(supplier_id, name, email)
     return suppliers[key]
 
+def get_positive_float(prompt: str) -> float:
+    while True:
+        try:
+            value = float(input(prompt))
+            if value <= 0:
+                print("Please enter a number greater than zero.")
+                continue
+            return value
+        except ValueError:
+            print("Please enter a valid number, e.g. 12.50")
 
 # ---------- Saving / loading ----------
 
@@ -143,16 +153,16 @@ def prompt_new_product() -> Product | None:
     try:
         product_id = input("Enter Product ID: ").strip()
         name = input("Enter Name: ").strip()
-        price = float(input("Enter Price: "))
+        price = get_positive_float("Enter Price: ")
         stock = int(input("Enter Stock: "))
         supplier = prompt_supplier()
 
         if type_choice == "1":
-            weight = float(input("Enter Weight (kg): "))
+            weight = get_positive_float("Enter Weight (kg): ")
             return ProductFactory.create("physical", product_id, name, price,
                                          stock, supplier, weight=weight)
         else:
-            download_size = float(input("Enter Download Size (MB): "))
+            download_size = get_positive_float("Enter Download Size (MB): ")
             return ProductFactory.create("digital", product_id, name, price,
                                          stock, supplier, download_size=download_size)
     except ValueError as e:
