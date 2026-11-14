@@ -6,4 +6,4 @@ class PercentageDiscount(DiscountStrategy):
             raise ValueError("Percentage must be between 0 and 100.")
         self.__percentage = percentage
     def apply(self, order_total: float) -> float:
-        return order_total * (self.__percentage - 100)/ 100
+        return order_total * (100 - self.__percentage)/ 100
