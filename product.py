@@ -10,10 +10,10 @@ class Product(ABC):
         self.__supplier: Supplier = supplier
 
     def update_stock(self, quantity) -> None:
-        print("Update Stock")
         if quantity < 0:
-            print("Stock cannot be negative.")
-            return
+            raise ValueError("Stock cannot be negative")
+
+        print("Update Stock")
     
         self.__stock = quantity
         print(f"\nNew Stock Quantity: {self.__stock}")

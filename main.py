@@ -272,8 +272,11 @@ def run_lsp_test() -> None:
     print("\n4. update_stock() keeps the same meaning for both:")
     laptop.update_stock(5)
     ebook.update_stock(50)
-    laptop.update_stock(-1)   # rejected the same way for both
-    ebook.update_stock(-1)
+    for item in (laptop, ebook):
+        try:
+            item.update_stock(-1)
+        except ValueError as e:
+            print(f"{item.get_name()}: rejected ({e})")
     print("Laptop stock:", laptop.get_stock(), "| Ebook stock:", ebook.get_stock())
 
     test_inventory.remove_product("T-D1")
@@ -330,10 +333,11 @@ while True:
                 continue
             try:
                 new_quantity = int(input("Enter New Stock Quantity: "))
-            except ValueError:
-                print("Please enter a whole number.")
+                product.update_stock(new_quantity)
+            except ValueError as e:
+                print(f"Invalid Input: {e}")
                 continue
-            product.update_stock(new_quantity)
+            
         case 4:
             product_id = input("Enter Product ID: ").strip()
             product = main_inventory.find_product(product_id)
