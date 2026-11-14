@@ -6,7 +6,7 @@ from supplier import Supplier
 from product import Product
 from physical_product import PhysicalProduct
 from digital_product import DigitalProduct
-from interface import CanBeShipped
+from product_factory import ProductFactory
 
 # Adjust the import names above to match your file names.
 
@@ -47,23 +47,19 @@ def product_to_dict(product: Product) -> dict:
 
 
 def dict_to_product(item: dict) -> Product:
-    product_type = item["Type"]
     price = float(str(item["Price"]).replace("$", ""))
 
-    # .get() with defaults keeps an old inventory.json (no supplier data) loading
     supplier = get_or_create_supplier(
         item.get("Supplier ID", "S000"),
         item.get("Supplier Name", "Unknown Supplier"),
         item.get("Supplier Email", "unknown@example.com"),
     )
 
-    if product_type == "physical":
-        return PhysicalProduct(item["ID"], item["Name"], price,
-                               item["Stock"], item["Weight"], supplier)
-    if product_type == "digital":
-        return DigitalProduct(item["ID"], item["Name"], price,
-                              item["Stock"], item["Download Size"], supplier)
-    raise ValueError(f"Unknown product type: {product_type}")
+    return ProductFactory.create(
+        item["Type"], item["ID"], item["Name"], price, item["Stock"], supplier,
+        weight=item.get("Weight", 1.0),
+        download_size=item.get("Download Size", 1.0),
+    )
 
 
 def load_inventory(inventory: Inventory) -> None:
@@ -100,12 +96,7 @@ def exit_program(inventory: Inventory) -> None:
 
 def show_product_details(product: Product) -> None:
     product.display_information()
-    print(product.get_fulfilment_info())
     print(f"Fulfilment: {product.get_fulfilment_info()}")
-    # if isinstance(product, CanBeShipped):
-    #     print(f"Shipping cost: ${product.calculate_shipping_cost():.2f}")
-    # print("Supplier:")
-    # product.get_supplier().display_information()
 
 
 def show_menu() -> None:
@@ -158,20 +149,22 @@ def prompt_new_product() -> Product | None:
 
         if type_choice == "1":
             weight = float(input("Enter Weight (kg): "))
-            return PhysicalProduct(product_id, name, price, stock, weight, supplier)
+            return ProductFactory.create("physical", product_id, name, price,
+                                         stock, supplier, weight=weight)
         else:
             download_size = float(input("Enter Download Size (MB): "))
-            return DigitalProduct(product_id, name, price, stock, download_size, supplier)
-    except ValueError:
-        print("Invalid numeric value.")
+            return ProductFactory.create("digital", product_id, name, price,
+                                         stock, supplier, download_size=download_size)
+    except ValueError as e:
+        print(f"Invalid input: {e}")
         return None
 
 
 def run_association_test() -> None:
     print("\n=== ASSOCIATION TEST: Supplier and Product ===")
     supplier = Supplier("S900", "Test Supplier", "test@example.com")
-    laptop = PhysicalProduct("T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier)
-    ebook = DigitalProduct("T-D1", "Test Ebook", 25.0, 100, 5.0, supplier)
+    laptop = ProductFactory.create("physical", "T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier)
+    ebook = ProductFactory.create("digital","T-D1", "Test Ebook", 25.0, 100, 5.0, supplier)
 
     print("\nLaptop's supplier:")
     laptop.get_supplier().display_information()
@@ -192,7 +185,7 @@ def run_association_test() -> None:
 def run_aggregation_test() -> None:
     print("\n=== AGGREGATION TEST: Inventory and Product ===")
     supplier = Supplier("S900", "Test Supplier", "test@example.com")
-    laptop = PhysicalProduct("T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier)
+    laptop = ProductFactory.create("physical", "T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier)
     inventory_a = Inventory()
     inventory_b = Inventory()
 
@@ -224,8 +217,8 @@ def run_aggregation_test() -> None:
 def run_composition_test() -> None:
     print("\n=== COMPOSITION TEST: Order and OrderLine ===")
     supplier = Supplier("S900", "Test Supplier", "test@example.com")
-    laptop = PhysicalProduct("T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier)
-    ebook = DigitalProduct("T-D1", "Test Ebook", 25.0, 100, 5.0, supplier)
+    laptop = ProductFactory.create("physical","T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier)
+    ebook = ProductFactory.create("digital","T-D1", "Test Ebook", 25.0, 100, 5.0, supplier)
 
     order_1 = Order("O001")
     order_1.add_order_line(laptop, 2)
@@ -258,8 +251,8 @@ def run_composition_test() -> None:
 def run_lsp_test() -> None:
     print("\n=== LSP TEST: Substitutability ===")
     supplier = Supplier("S900", "Test Supplier", "test@example.com")
-    laptop = PhysicalProduct("T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier)
-    ebook = DigitalProduct("T-D1", "Test Ebook", 25.0, 100, 5.0, supplier)
+    laptop = ProductFactory.create("physical","T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier)
+    ebook = ProductFactory.create("digital", "T-D1", "Test Ebook", 25.0, 100, 5.0, supplier)
 
     print("\n1. One function, both subclasses (no changes to the function):")
     show_product_details(laptop)
@@ -296,9 +289,9 @@ def run_polymorphism_test() -> None:
     #   Ebook  -> "Product is delivered digitally"
 
     inventory = Inventory()
-    inventory.add_product(PhysicalProduct("T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier))
-    inventory.add_product(DigitalProduct("T-D1", "Test Ebook", 25.0, 100, 5.0, supplier))
-    inventory.add_product(PhysicalProduct("T-P2", "Test Keyboard", 80.0, 30, 0.8, supplier))
+    inventory.add_product(ProductFactory.create("physical","T-P1", "Test Laptop", 1200.0, 10, 2.5, supplier))
+    inventory.add_product(ProductFactory.create("digital","T-D1", "Test Ebook", 25.0, 100, 5.0, supplier))
+    inventory.add_product(ProductFactory.create("physical","T-P2", "Test Keyboard", 80.0, 30, 0.8, supplier))
 
     print("\nOne loop over the Product collection, no isinstance():\n")
     for product in inventory.get_all_products():
@@ -315,9 +308,9 @@ load_inventory(main_inventory)
 while True:
     show_menu()
     try:
-        option = int(input("Enter option (1-10): "))
+        option = int(input("Enter option (1-11): "))
     except ValueError:
-        print("Please enter a number from 1 to 10.")
+        print("Please enter a number from 1 to 11.")
         continue
 
     match option:
